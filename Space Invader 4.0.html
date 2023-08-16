@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Raumschiffschlacht</title>
+
+    <style>
+        canvas {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+    </style>
+
+    <script>
+        let KEY_SPACE = false; // Variable, um den Tastenzustand der Leertaste zu speichern
+        let KEY_UP = false; // Variable, um den Tastenzustand der Pfeiltaste Nach oben zu speichern
+        let KEY_DOWN = false; // Variable, um den Tastenzustand der Pfeiltaste Nach unten zu speichern
+        let canvas; // Referenz auf das Canvas-Element
+        let ctx; // 2D-Kontext des Canvas-Elements
+        let backgroundImage = new Image(); // Bildobjekt für den Hintergrund
+
+        let rocket = {
+            x: 50,
+            y: 200,
+            width: 200,
+            height: 200,
+            src: 'rocket.png'
+        }; // Objekt, das Informationen über das Raumschiff enthält
+
+        let ufos = []; // Array zur Speicherung der UFO-Objekte
+        let shots = []; // Array zur Speicherung der Schuss-Objekte
+        let score = 0; // Aktueller Punktestand
+        let gameOver = false; // Variable, um den Spielstatus zu speichern
+
+        let ufosMultiplier = 1; // Multiplikator für die Anzahl der UFOs
+        let eventActive = false; // Variable, um den Zustand des Events zu speichern
+        let eventDuration = 30000; // Dauer des Events in Millisekunden (hier: 30 Sekunden)
+        let eventStartTime = 0; // Startzeitpunkt des Events
+
+        // Event Listener für Tastendruck (KeyDown)
+        document.onkeydown = function(e) {
+            if (e.keyCode == 32) { // Leertaste gedrückt
+                KEY_SPACE = true;
+            }
+
+            if (e.keyCode == 38) { // Nach oben gedrückt
+                KEY_UP = true;
+            }
+
+            if (e.keyCode == 40) { // Nach unten gedrückt
+                KEY_DOWN = true;
+            }
+        }
+
+        // Event Listener für Taste loslassen (KeyUp)
+        document.onkeyup = function(e) {
+            if (e.keyCode == 32) { // Leertaste losgelassen
+                KEY_SPACE = false;
+            }
+
+            if (e.keyCode == 38) { // Nach oben losgelassen
+                KEY_UP = false;
+            }
+
+            if (e.keyCode == 40) { // Nach unten losgelassen
+                KEY_DOWN = false;
+            }
+        }
+
+        // Funktion, um das Spiel zu starten
+        function startGame() {
+            canvas = document.getElementById('canvas'); // Canvas-Element abrufen
+            ctx = canvas.getContext('2d'); // 2D-Kontext des Canvas abrufen
+            loadImages(); // Grafiken laden
+            setInterval(update, 1000 / 25); // Spielzustand aktualisieren (25-mal pro Sekunde)
+            setInterval(createUfos, 5000); // UFOs erzeugen (alle 5 Sekunden)
+            setInterval(checkForCollion, 1000 / 25); // Kollisionen überprüfen (25-mal pro Sekunde)
+            setInterval(checkForShoot, 1000 / 10); // Schüsse überprüfen (10-mal pro Sekunde)
+            draw(); // Spiel zeichnen
+        }
+
+        // Funktion, um Kollisionen zwischen Raumschiff und UFOs zu überprüfen
+        function checkForCollion() {
+            if (gameOver) {
+                return;
+            }
+
+            ufos.forEach(function(ufo) {
+                if (rocket.x + rocket.width > ufo.x &&
+                    rocket.y + rocket.height > ufo.y &&
+                    rocket.x < ufo.x &&
+                    rocket.y < ufo.y + ufo.height
+                ) {
+                    rocket.img.src = 'boom.png'; // Explosionssprite für das Raumschiff anzeigen
+                    console.log('Collision!!!');
+                    ufos = ufos.filter(u => u != ufo); // Kollidiertes UFO aus dem Array entfernen
+                    gameOver = true; // Spielstatus auf Game Over setzen
+                    endGame(); // Spielende-Funktion aufrufen
+                }
+
+                shots.forEach(function(shot) {
+                    if (shot.x + shot.width > ufo.x &&
+                        shot.y + shot.height > ufo.y &&
+                        shot.x < ufo.x &&
+                        shot.y < ufo.y + ufo.height
+                    ) {
+                        ufo.hit = true; // Markieren, dass das UFO getroffen wurde
+                        ufo.img.src = 'boom.png'; // Explosionssprite für das UFO anzeigen
+                        console.log('Collision!!!');
+
+                        setTimeout(() => {
+                            ufos = ufos.filter(u => u != ufo); // Getroffenes UFO aus dem Array entfernen (nach 2 Sekunden)
+                        }, 2000);
+
+                        score += 1; // Den Punktestand um 1 erhöhen
+                    }
+                });
+            });
+        }
+
+        // Funktion, um neue UFOs zu erzeugen
+        function createUfos() {
+            let ufo = {
+                x: 1700,
+                y: Math.random() * 500,
+                width: 100,
+                height: 100,
+                src: 'ufo.png',
+                img: new Image()
+            };
+            ufo.img.src = ufo.src;
+
+            // Überprüfung, ob das Event aktiv ist, und Anzahl der UFOs entsprechend anpassen
+            if (eventActive) {
+                ufosMultiplier *= 2;
+            }
+
+            for (let i = 0; i < ufosMultiplier; i++) {
+                ufos.push(ufo); // UFOs zum Array hinzufügen
+            }
+        }
+
+        // Funktion, um Schüsse zu überprüfen
+        function checkForShoot() {
+            if (gameOver) {
+                return;
+            }
+
+            if (KEY_SPACE) {
+                let shot = {
+                    x: rocket.x + 110,
+                    y: rocket.y + 22,
+                    width: 40,
+                    height: 40,
+                    src: 'shot.png',
+                    img: new Image()
+                };
+                shot.img.src = shot.src;
+
+                shots.push(shot); // Schuss zum Array hinzufügen
+            }
+        }
+
+        // Funktion, um den Spielzustand zu aktualisieren
+        function update() {
+            if (gameOver) {
+                return;
+            }
+
+            if (KEY_UP) {
+                rocket.y -= 5; // Raumschiff nach oben bewegen
+            }
+
+            if (KEY_DOWN) {
+                rocket.y += 5; // Raumschiff nach unten bewegen
+            }
+
+            ufos.forEach(function(ufo) {
+                if (!ufo.hit) {
+                    ufo.x -= 5; // UFOs nach links bewegen (nur wenn sie nicht getroffen wurden)
+                }
+            });
+
+            shots.forEach(function(shot) {
+                shot.x += 15; // Schüsse nach rechts bewegen
+            });
+
+            // Überprüfung, ob das Event aktiv ist und die Event-Dauer abgelaufen ist
+            if (eventActive && Date.now() - eventStartTime > eventDuration) {
+                eventActive = false; // Event deaktivieren
+                ufosMultiplier = 1; // Anzahl der UFOs zurücksetzen
+            }
+        }
+
+        // Funktion, um die Grafiken zu laden
+        function loadImages() {
+            backgroundImage.src = 'background.jpeg'; // Hintergrundbild laden
+            rocket.img = new Image();
+            rocket.img.src = rocket.src; // Raumschiffbild laden
+        }
+
+        // Funktion, um das Spiel auf dem Canvas zu zeichnen
+        function draw() {
+            ctx.drawImage(backgroundImage, 0, 0); // Hintergrundbild zeichnen
+            ctx.drawImage(rocket.img, rocket.x, rocket.y, rocket.width, rocket.height); // Raumschiff zeichnen
+
+            ufos.forEach(function(ufo) {
+                ctx.drawImage(ufo.img, ufo.x, ufo.y, ufo.width, ufo.height); // UFOs zeichnen
+            });
+
+            shots.forEach(function(shot) {
+                ctx.drawImage(shot.img, shot.x, shot.y, shot.width, shot.height); // Schüsse zeichnen
+            });
+
+            ctx.font = '20px Arial';
+            ctx.fillStyle = '#fff';
+            ctx.fillText('Score: ' + score, 20, 40); // Punktestand anzeigen
+
+            if (gameOver) {
+                ctx.font = '40px Arial';
+                ctx.fillText('Game Over', canvas.width / 2 - 100, canvas.height / 2); // "Game Over" anzeigen
+                ctx.fillText('Press Enter to Restart', canvas.width / 2 - 160, canvas.height / 2 + 40); // "Press Enter to Restart" anzeigen
+            } else {
+                requestAnimationFrame(draw);
+            }
+        }
+
+        // Funktion, um den aktuellen Highscore zu speichern
+        function saveHighscore() {
+            let highscore = localStorage.getItem('highscore');
+            if (!highscore || score > highscore) {
+                localStorage.setItem('highscore', score);
+            }
+        }
+
+        // Funktion, um den gespeicherten Highscore anzuzeigen
+        function showHighscore() {
+            let highscore = localStorage.getItem('highscore');
+            if (highscore) {
+                alert('Highscore: ' + highscore);
+            } else {
+                alert('No highscore recorded yet.');
+            }
+        }
+
+        // Funktion, die bei Spielende aufgerufen wird
+        function endGame() {
+            saveHighscore(); // Highscore speichern
+            showHighscore(); // Highscore anzeigen
+        }
+
+        // Funktion zum Neustarten des Spiels
+        function restartGame() {
+            location.reload(); // Seite neu laden
+        }
+
+        // Funktion, um das Event zu aktivieren
+        function activateEvent() {
+            eventActive = true; // Event aktivieren
+            eventStartTime = Date.now(); // Startzeitpunkt des Events festlegen
+        }
+    </script>
+</head>
+
+<body onload="startGame()">
+    <canvas id="canvas" width="1580" height="760"></canvas>
+
+    <button onclick="saveHighscore()">Save Highscore</button>
+    <button onclick="showHighscore()">Show Highscore</button>
+    <button onclick="activateEvent()">Activate Event</button>
+
+    <!-- Neustart-Button -->
+    <button onclick="restartGame()" id="restartButton" style="display: none;">Restart</button>
+
+    <script>
+        // Event Listener für die Enter-Taste (KeyCode 13)
+        document.addEventListener('keyup', function(e) {
+            if (e.keyCode === 13 && gameOver) {
+                restartGame(); // Spiel neu starten, wenn Enter-Taste gedrückt wird
+            }
+        });
+    </script>
+</body>
+
+</html>
